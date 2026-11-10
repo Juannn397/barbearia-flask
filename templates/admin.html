@@ -1,0 +1,261 @@
+
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Barber Studio | Administração</title>
+
+    <style>
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            padding: 25px 16px;
+            background: #101827;
+            color: #f8fafc;
+            font-family: Arial, sans-serif;
+        }
+
+        main {
+            max-width: 1100px;
+            margin: auto;
+        }
+
+        h1 { color: #fbbf24; }
+
+        a { color: #fbbf24; }
+
+        .painel, .agendamento {
+            padding: 22px;
+            background: #1e293b;
+            border-radius: 14px;
+            margin-bottom: 18px;
+        }
+
+        .topo {
+            display: flex;
+            justify-content: space-between;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .grade {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 18px;
+        }
+
+        .agendamento p {
+            color: #cbd5e1;
+            margin: 8px 0;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 7px 12px;
+            border-radius: 20px;
+            background: #92400e;
+            font-size: 13px;
+            font-weight: bold;
+        }
+
+        .concluido {
+            background: #166534;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            color: white;
+            background: #0f172a;
+            border: 1px solid #475569;
+            border-radius: 8px;
+        }
+
+        button {
+            padding: 12px 17px;
+            background: #fbbf24;
+            color: #111827;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 12px;
+        }
+
+        .foto {
+            max-width: 100%;
+            max-height: 260px;
+            margin-top: 12px;
+            border-radius: 10px;
+        }
+
+        .mensagem {
+            background: #334155;
+            padding: 14px;
+            border-radius: 8px;
+            margin-bottom: 18px;
+        }
+
+        .login {
+            max-width: 420px;
+            margin: 90px auto;
+        }
+
+        @media (max-width: 700px) {
+            .grade {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+<main>
+    {% if not autenticado %}
+
+        <section class="painel login">
+            <h1>✂ Barber Studio</h1>
+            <p>Área administrativa</p>
+
+            {% for mensagem in get_flashed_messages() %}
+                <div class="mensagem">{{ mensagem }}</div>
+            {% endfor %}
+
+            <form method="POST" action="/admin">
+                <input type="hidden" name="_csrf" value="{{ csrf }}">
+
+                <label for="senha">Senha do administrador</label>
+                <input
+                    id="senha"
+                    type="password"
+                    name="senha"
+                    required
+                >
+
+                <button type="submit">Entrar</button>
+            </form>
+
+            <p><a href="/">Voltar ao agendamento</a></p>
+        </section>
+
+    {% else %}
+
+        <div class="topo">
+            <div>
+                <h1>Gestão da Barbearia</h1>
+                <p>Controle de agendamentos e serviços.</p>
+                <a href="/">Página de agendamentos</a>
+            </div>
+
+            <form action="/sair" method="POST">
+                <input type="hidden" name="_csrf" value="{{ csrf }}">
+                <button type="submit">Sair</button>
+            </form>
+        </div>
+
+        {% for mensagem in get_flashed_messages() %}
+            <div class="mensagem">{{ mensagem }}</div>
+        {% endfor %}
+
+        <h2>Agendamentos ({{ agendamentos|length }})</h2>
+
+        <section class="grade">
+
+            {% for agendamento in agendamentos %}
+
+                <article class="agendamento">
+                    <h3>{{ agendamento.cliente }}</h3>
+
+                    <p>
+                        <strong>Serviço:</strong>
+                        {{ agendamento.servico }}
+                    </p>
+
+                    <p>
+                        <strong>Barbeiro:</strong>
+                        {{ agendamento.barbeiro }}
+                    </p>
+
+                    <p>
+                        <strong>Data:</strong>
+                        {{ agendamento.data }}
+                    </p>
+
+                    <p>
+                        <strong>Horário:</strong>
+                        {{ agendamento.horario[:5] }}
+                    </p>
+
+                    <p>
+                        <span class="status {% if agendamento.status == 'concluido' %}concluido{% endif %}">
+                            {% if agendamento.status == 'concluido' %}
+                                ✅ Concluído
+                            {% else %}
+                                🕒 Agendado
+                            {% endif %}
+                        </span>
+                    </p>
+
+                    {% if agendamento.status == "agendado" %}
+
+                        <hr>
+
+                        <h4>Enviar foto para concluir</h4>
+
+                        <form
+                            action="/concluir/{{ agendamento.id }}"
+                            method="POST"
+                            enctype="multipart/form-data"
+                        >
+                            <input
+                                type="hidden"
+                                name="_csrf"
+                                value="{{ csrf }}"
+                            >
+
+                            <input
+                                type="file"
+                                name="foto"
+                                accept="image/jpeg,image/png,image/webp"
+                                required
+                            >
+
+                            <button type="submit">
+                                Enviar foto e concluir
+                            </button>
+                        </form>
+
+                    {% elif agendamento.foto_url %}
+
+                        <p>Fotografia do serviço realizado:</p>
+
+                        <a href="{{ agendamento.foto_url }}" target="_blank" rel="noopener noreferrer">
+                            <img
+                                class="foto"
+                                src="{{ agendamento.foto_url }}"
+                                alt="Foto do serviço realizado"
+                            >
+                        </a>
+
+                    {% else %}
+
+                        <p>Foto temporariamente indisponível.</p>
+
+                    {% endif %}
+                </article>
+
+            {% else %}
+
+                <div class="painel">
+                    Nenhum agendamento cadastrado ainda.
+                </div>
+
+            {% endfor %}
+        </section>
+
+    {% endif %}
+</main>
+</body>
+</html>
