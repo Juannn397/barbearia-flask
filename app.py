@@ -8,9 +8,10 @@ from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 from flask import (
-    Flask, flash, redirect, render_template,
+    Flask, flash, jsonify, redirect, render_template,
     request, session, url_for
 )
+
 from PIL import Image, ImageOps, UnidentifiedImageError
 from supabase import create_client
 from werkzeug.exceptions import RequestEntityTooLarge
@@ -87,6 +88,54 @@ def inicio():
     )
 
 
+# Consultar horarios livres no Supabase
+@app.route("/horarios-disponiveis")
+def horarios_disponiveis():
+    barbeiro = request.args.get("barbeiro", "")
+    data = request.args.get("data", "")
+
+    if barbeiro not in BARBEIROS:
+        return jsonify({"horarios": []}), 400
+
+    try:
+        data_escolhida = datetime.strptime(
+            data, "%Y-%m-%d"
+        ).date()
+    except ValueError:
+        return jsonify({"horarios": []}), 400
+
+    agora = datetime.now(FUSO)
+
+    if data_escolhida < agora.date():
+        return jsonify({"horarios": []})
+
+    resultado = (
+        db.table("agendamentos_barbearia")
+        .select("horario")
+        .eq("barbeiro", barbeiro)
+        .eq("data", data)
+        .execute()
+    )
+
+    ocupados = {
+        str(item["horario"])[:5]
+        for item in resultado.data
+    }
+
+    livres = []
+
+    for horario in HORARIOS:
+        momento = datetime.strptime(
+            f"{data} {horario}",
+            "%Y-%m-%d %H:%M"
+        ).replace(tzinfo=FUSO)
+
+        if horario not in ocupados and momento > agora:
+            livres.append(horario)
+
+    return jsonify({"horarios": livres})
+
+
 # Cadastrar o agendamento
 @app.route("/agendar", methods=["POST"])
 def agendar():
@@ -112,8 +161,17 @@ def agendar():
         flash("Data inválida.")
         return redirect(url_for("inicio"))
 
-    if data_escolhida < hoje() or horario not in HORARIOS:
-        flash("Escolha uma data e horário válidos.")
+    if horario not in HORARIOS:
+        flash("Escolha um horário válido.")
+        return redirect(url_for("inicio"))
+
+    momento_agendamento = datetime.strptime(
+        f"{data} {horario}",
+        "%Y-%m-%d %H:%M"
+    ).replace(tzinfo=FUSO)
+
+    if momento_agendamento <= datetime.now(FUSO):
+        flash("Não é possível agendar um horário que já passou.")
         return redirect(url_for("inicio"))
 
     try:

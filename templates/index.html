@@ -181,13 +181,12 @@
 
                 <div>
                     <label for="horario">Horário</label>
-                    <select id="horario" name="horario" required>
-                        {% for horario in horarios %}
-                            <option value="{{ horario }}">
-                                {{ horario }}
-                            </option>
-                        {% endfor %}
-                    </select>
+                    
+                    <select id="horario" name="horario" required disabled>
+    <option value="">
+        Escolha o barbeiro e a data
+    </option>
+</select>
                 </div>
 
             </div>
@@ -205,5 +204,93 @@
         <a href="/admin">Área administrativa</a>
     </footer>
 </main>
+
+
+<script>
+    const barbeiroCampo = document.getElementById("barbeiro");
+    const dataCampo = document.getElementById("data");
+    const horarioCampo = document.getElementById("horario");
+
+    let ultimaConsulta = 0;
+
+    async function atualizarHorarios() {
+        const barbeiro = barbeiroCampo.value;
+        const data = dataCampo.value;
+        const consultaAtual = ++ultimaConsulta;
+
+        horarioCampo.disabled = true;
+        horarioCampo.innerHTML =
+            '<option value="">Escolha a data</option>';
+
+        if (!barbeiro || !data) {
+            return;
+        }
+
+        horarioCampo.innerHTML =
+            '<option value="">Consultando horários...</option>';
+
+        try {
+            const parametros = new URLSearchParams({
+                barbeiro: barbeiro,
+                data: data
+            });
+
+            const resposta = await fetch(
+                "/horarios-disponiveis?" + parametros.toString()
+            );
+
+            if (!resposta.ok) {
+                throw new Error("Falha ao consultar horários");
+            }
+
+            const dados = await resposta.json();
+
+            // Ignorar uma consulta antiga caso o cliente
+            // tenha mudado a data ou o barbeiro.
+            if (consultaAtual !== ultimaConsulta) {
+                return;
+            }
+
+            horarioCampo.innerHTML = "";
+
+            if (dados.horarios.length === 0) {
+                horarioCampo.innerHTML =
+                    '<option value="">Nenhum horário disponível</option>';
+                return;
+            }
+
+            const escolha = document.createElement("option");
+            escolha.value = "";
+            escolha.textContent = "Selecione um horário";
+            horarioCampo.appendChild(escolha);
+
+            dados.horarios.forEach(function(horario) {
+                const opcao = document.createElement("option");
+
+                opcao.value = horario;
+                opcao.textContent = horario;
+
+                horarioCampo.appendChild(opcao);
+            });
+
+            horarioCampo.disabled = false;
+
+        } catch (erro) {
+            if (consultaAtual !== ultimaConsulta) {
+                return;
+            }
+
+            horarioCampo.innerHTML =
+                '<option value="">Erro ao consultar horários</option>';
+        }
+    }
+
+    barbeiroCampo.addEventListener("change", atualizarHorarios);
+    dataCampo.addEventListener("change", atualizarHorarios);
+
+    atualizarHorarios();
+</script>
+
+
 </body>
 </html>
